@@ -48,13 +48,12 @@ unsigned long ch_time { 0 };      // Last channel hop time
 // ===== Sniffer function ===== //
 void sniffer(uint8_t *buf, uint16_t len) {
   if (!buf || len < 28) return; // Drop packets without MAC header
-  byte pkt_type = buf[12];      // second half of frame control field
-  //byte* addr_a = &buf[16];    // first MAC address
-  //byte* addr_b = &buf[22];    // second MAC address
+  
+  byte pkt_type = buf[12]; // second half of frame control field
 
-  // If captured packet is a deauthentication or dissassociaten frame
+  // If captured packet is a deauthentication (0xA0) or disassociation (0xC0) frame
   if (pkt_type == 0xA0 || pkt_type == 0xC0) {
-    ++packet_rate;
+    ++packet_rate; // Only count these specific packets
   }
 }
 
@@ -127,59 +126,50 @@ void sniffer_stop(){
 
 // ===== Loop ===== //
 void loop() {
-  unsigned long current_time = millis(); // Get current time (in ms)
+  unsigned long current_time = millis();
 
-  // Update each second (or scan-time-per-channel * channel-range)
-  if (current_time - update_time >= (sizeof(channels)*CH_TIME)) {
-    update_time = current_time; // Update time variable
+  // Update attack detection logic based on packet_rate
+  if (current_time - update_time >= (sizeof(channels) * CH_TIME)) {
+    update_time = current_time;
+
     // When detected deauth packets exceed the minimum allowed number
     if (packet_rate >= PKT_RATE) {
-      ++attack_counter; // Increment attack counter
+      ++attack_counter; // Increment attack counter if packet rate is high enough
     } else {
-      if(attack_counter >= PKT_TIME) attack_stopped();
+      if (attack_counter >= PKT_TIME) {
+        attack_stopped(); // Stop attack if it was ongoing
+      }
       attack_counter = 0; // Reset attack counter
     }
 
     // When attack exceeds minimum allowed time
     if (attack_counter == PKT_TIME) {
       attack_started();
-      ++total_attack_counter;
+      ++total_attack_counter; // Increment total attack counter
     }
 
-    if (packet_rate != 0) {
-      packets_count = int(packet_rate);
-    }
+    // Update packet count for display
+    packets_count = packet_rate;
 
-    Serial.print("Packets/s: ");
-    Serial.println(packet_rate);
-    Serial.print("Attacks: ");
-    Serial.println(total_attack_counter);
-
-    packet_rate = 0; // Reset packet rate
+    // Reset packet rate
+    packet_rate = 0;
   }
-    if (ATTACK == true){
-          display_string(" Attack!");
-    }
-    else{
-          display_string(" scanning");
-    }
 
-    // counters for display stuff
-    cc2 += 1;
-    if (cc2 == 4) { cc2 = 0;}
-    cc3 += 1;
-    if (cc3 == 41) { cc3 = 0;}
+  // Update display with attack status
+  if (ATTACK) {
+    display_string(" Attack!");
+  } else {
+    display_string(" scanning");
+  }
+
+  // Update counters for display animation
+  cc2 = (cc2 + 1) % 4;
+  cc3 = (cc3 + 1) % 41;
 
   // Channel hopping
   if (sizeof(channels) > 1 && current_time - ch_time >= CH_TIME) {
-    ch_time = current_time; // Update time variable
-
-    // Get next channel
-    ch_index = (ch_index+1) % (sizeof(channels)/sizeof(channels[0]));
-    short ch = channels[ch_index];
-
-    // Set channel
-    wifi_set_channel(ch);
+    ch_time = current_time;
+    ch_index = (ch_index + 1) % (sizeof(channels) / sizeof(channels[0]));
+    wifi_set_channel(channels[ch_index]);
   }
-
 }
