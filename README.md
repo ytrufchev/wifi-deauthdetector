@@ -1,3 +1,5 @@
+!!! This is a fork of https://github.com/gdamdam/wifi-deauthdetector to try and decrease the rate of false positives !!!
+
 # WiFi DeauthDetector (O_o) 
 ## a cute deauthentication frames detector with an ESP8266 and oled shield
 
